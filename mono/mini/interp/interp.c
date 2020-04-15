@@ -7183,6 +7183,9 @@ interp_parse_options (const char *options)
 {
 	char **args, **ptr;
 
+	/* FIXME: always disable inlining for EnC prototype */
+	mono_interp_opt &= ~INTERP_OPT_INLINE;
+
 	if (!options)
 		return;
 
