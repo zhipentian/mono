@@ -36,8 +36,7 @@ _mac-$(1)_CXXFLAGS= \
 
 _mac-$(1)_CPPFLAGS=
 
-_mac-$(1)_LDFLAGS= \
-	-Wl,-no_weak_imports
+_mac-$(1)_LDFLAGS=
 
 _mac-$(1)_CONFIGURE_FLAGS= \
 	--disable-boehm \

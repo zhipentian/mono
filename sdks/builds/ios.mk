@@ -90,7 +90,6 @@ _ios-$(1)_CPPFLAGS= \
 	-DSMALL_CONFIG -D_XOPEN_SOURCE -DHOST_IOS -DHAVE_LARGE_FILE_SUPPORT=1 \
 
 _ios-$(1)_LDFLAGS= \
-	-Wl,-no_weak_imports \
 	-arch $(3) \
 	-framework CoreFoundation \
 	-lobjc -lc++
