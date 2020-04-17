@@ -37,14 +37,14 @@ fi
 $CSC $NAME.cs
 
 $ILDASM $NAME.exe > $NAME.il
-rm $NAME.exe
+rm -f $NAME.exe
 
 ILASM_ARGS=""
 for arg in ${NAME}_v?.il; do
 	ILASM_ARGS="$ILASM_ARGS -ENC=$arg"
 done
 
-rm $OUT.*
+rm -f $OUT.*
 $ILASM -DEBUG -OUT=$OUT.exe $NAME.il $ILASM_ARGS
 
 cp template.runtimeconfig.json $OUT.runtimeconfig.json
