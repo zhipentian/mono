@@ -27,6 +27,10 @@
 #include <mono/utils/mono-counters.h>
 #include <mono/utils/mono-logger-internals.h>
 #include <mono/utils/mono-tls-inline.h>
+// hrm.
+#define HAVE_SGEN_GC
+#include <mono/sgen/sgen-gc.h>
+#include <mono/utils/mono-threads.h>
 #include <mono/utils/mono-membar.h>
 
 #ifdef HAVE_ALLOCA_H
@@ -7602,32 +7606,42 @@ copy_imethod_for_frame (MonoDomain *domain, InterpFrame *frame)
 static void
 interp_invalidate_transformed (MonoDomain *domain)
 {
-	/* TODO more locking */
+	mono_gc_stop_world ();
 	/* (1) make a copy of imethod for every interpframe that is on the stack,
 	 * so we do not invalidate currently running methods */
 
-	/* TODO: make it for each thread */
-	MonoLMF *lmf = mono_get_lmf ();
-	while (lmf) {
-		if (((gsize) lmf->previous_lmf) & 2) {
-			MonoLMFExt *ext = (MonoLMFExt *) lmf;
-			if (ext->kind == MONO_LMFEXT_INTERP_EXIT || ext->kind == MONO_LMFEXT_INTERP_EXIT_WITH_CTX) {
-				InterpFrame *frame = ext->interp_exit_data;
-				while (frame) {
-					mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_METADATA_UPDATE, "copy imethod for method=%s\n", mono_method_full_name (frame->imethod->method, 1));
-					copy_imethod_for_frame (domain, frame);
-					frame = frame->parent;
+	FOREACH_THREAD_EXCLUDE (info, MONO_THREAD_INFO_FLAGS_NO_GC) {
+		if (!info)
+			continue;
+		if (info->client_info.skip)
+			continue;
+		if (!info->client_info.info.jit_data)
+			continue;
+
+		MonoLMF *lmf = info->client_info.info.jit_data->lmf;
+		while (lmf) {
+			if (((gsize) lmf->previous_lmf) & 2) {
+				MonoLMFExt *ext = (MonoLMFExt *) lmf;
+				if (ext->kind == MONO_LMFEXT_INTERP_EXIT || ext->kind == MONO_LMFEXT_INTERP_EXIT_WITH_CTX) {
+					InterpFrame *frame = ext->interp_exit_data;
+					while (frame) {
+						mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_METADATA_UPDATE, "threadinfo=%p, copy imethod for method=%s", info, mono_method_full_name (frame->imethod->method, 1));
+						copy_imethod_for_frame (domain, frame);
+						frame = frame->parent;
+					}
 				}
 			}
+			lmf = (MonoLMF *)(((gsize) lmf->previous_lmf) & ~3);
 		}
-		lmf = (MonoLMF *)(((gsize) lmf->previous_lmf) & ~3);
-	}
+	} FOREACH_THREAD_END
 
 	/* (2) invalidate all the registered imethods */
 	MonoJitDomainInfo *info = domain_jit_info (domain);
 	mono_domain_jit_code_hash_lock (domain);
 	mono_internal_hash_table_apply (&info->interp_code_hash, invalidate_transform);
 	mono_domain_jit_code_hash_unlock (domain);
+
+	mono_gc_restart_world ();
 }
 
 static void

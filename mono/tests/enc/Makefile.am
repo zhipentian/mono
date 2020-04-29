@@ -4,8 +4,7 @@ ROSLYNILDIFF ?=/Users/lewurm/work/roslynildiff/bin/Debug/roslynildiff.exe
 DISABLED_TESTS := \
 	AddClass.dll \
 	AddStaticField.dll \
-	LambdaFunc.dll \
-	OnStackMethodThreadThread.dll
+	LambdaFunc.dll
 
 TESTS_REGULAR := \
 	AddClass.dll \
