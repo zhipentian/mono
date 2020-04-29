@@ -25,6 +25,7 @@
 #include <mono/utils/gc_wrapper.h>
 #include <mono/utils/mono-math.h>
 #include <mono/utils/mono-counters.h>
+#include <mono/utils/mono-logger-internals.h>
 #include <mono/utils/mono-tls-inline.h>
 #include <mono/utils/mono-membar.h>
 
@@ -7587,8 +7588,41 @@ invalidate_transform (gpointer imethod_)
 }
 
 static void
+copy_imethod_for_frame (InterpFrame *frame)
+{
+	InterpMethod *copy = g_malloc0 (sizeof (InterpMethod));
+	memcpy (copy, frame->imethod, sizeof (InterpMethod));
+	copy->next_jit_code_hash = NULL; /* we don't want that in our copy */
+	frame->imethod = copy;
+	/* Note, the copy will leak eventually. If needed, we can add a bit upon
+	 * frame cleanup. For now it should be good. */
+}
+
+static void
 interp_invalidate_transformed (MonoDomain *domain)
 {
+	/* TODO more locking */
+	/* (1) make a copy of imethod for every interpframe that is on the stack,
+	 * so we do not invalidate currently running methods */
+
+	/* TODO: make it for each thread */
+	MonoLMF *lmf = mono_get_lmf ();
+	while (lmf) {
+		if (((gsize) lmf->previous_lmf) & 2) {
+			MonoLMFExt *ext = (MonoLMFExt *) lmf;
+			if (ext->kind == MONO_LMFEXT_INTERP_EXIT || ext->kind == MONO_LMFEXT_INTERP_EXIT_WITH_CTX) {
+				InterpFrame *frame = ext->interp_exit_data;
+				while (frame) {
+					mono_trace (G_LOG_LEVEL_DEBUG, MONO_TRACE_METADATA_UPDATE, "copy imethod for method=%s\n", mono_method_full_name (frame->imethod->method, 1));
+					copy_imethod_for_frame (frame);
+					frame = frame->parent;
+				}
+			}
+		}
+		lmf = (MonoLMF *)(((gsize) lmf->previous_lmf) & ~3);
+	}
+
+	/* (2) invalidate all the registered imethods */
 	MonoJitDomainInfo *info = domain_jit_info (domain);
 	mono_domain_jit_code_hash_lock (domain);
 	mono_internal_hash_table_apply (&info->interp_code_hash, invalidate_transform);
