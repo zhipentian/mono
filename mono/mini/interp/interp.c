@@ -27,9 +27,6 @@
 #include <mono/utils/mono-counters.h>
 #include <mono/utils/mono-logger-internals.h>
 #include <mono/utils/mono-tls-inline.h>
-// hrm.
-#define HAVE_SGEN_GC
-#include <mono/sgen/sgen-gc.h>
 #include <mono/utils/mono-threads.h>
 #include <mono/utils/mono-membar.h>
 
@@ -7613,12 +7610,8 @@ interp_invalidate_transformed (MonoDomain *domain)
 	FOREACH_THREAD_EXCLUDE (info, MONO_THREAD_INFO_FLAGS_NO_GC) {
 		if (!info)
 			continue;
-		if (info->client_info.skip)
-			continue;
-		if (!info->client_info.info.jit_data)
-			continue;
 
-		MonoLMF *lmf = info->client_info.info.jit_data->lmf;
+		MonoLMF *lmf = info->jit_data->lmf;
 		while (lmf) {
 			if (((gsize) lmf->previous_lmf) & 2) {
 				MonoLMFExt *ext = (MonoLMFExt *) lmf;

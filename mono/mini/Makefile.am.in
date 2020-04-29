@@ -81,7 +81,6 @@ if !ENABLE_MSVC_ONLY
 
 AM_CFLAGS = \
 	-I$(top_srcdir) 	\
-	-I$(top_srcdir)/mono 	\
 	$(GLIB_CFLAGS)		\
 	$(LLVM_CFLAGS)		\
 	$(JEMALLOC_CFLAGS)	\
